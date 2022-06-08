@@ -32,11 +32,13 @@ activity_group.add_argument('-l', '--lunch', dest='lunch',
 # remove_group contains all commands that remove clock records
 #   from the table
 remove_group = parser.add_mutually_exclusive_group()
-remove_group.add_argument('-r', '--remove',
+remove_group.add_argument('-rm', '--remove',
                     type=int, nargs='+', help='remove the i_th record')
-remove_group.add_argument('-c', '--clear',
+remove_group.add_argument('--clear',
                     action='store_true', help='remove all clock records')
 
+parser.add_argument('-t', '--today',
+                    action='store_true', help='display a summary of today\'s work')
 parser.add_argument('-d', '--display',
                     action='store_true', help='display work clock records')
 
@@ -63,3 +65,5 @@ elif args.clear:
 
 if args.display and not args.clear:
     clockdb.display()
+if args.today:
+    clockdb.display_summary_today()
