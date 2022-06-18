@@ -32,13 +32,15 @@ activity_group.add_argument('-l', '--lunch', dest='lunch',
 # remove_group contains all commands that remove clock records
 #   from the table
 remove_group = parser.add_mutually_exclusive_group()
-remove_group.add_argument('-rm', '--remove',
+remove_group.add_argument('-r', '--remove',
                     type=int, nargs='+', help='remove the i_th record')
 remove_group.add_argument('--clear',
                     action='store_true', help='remove all clock records')
 
 parser.add_argument('-t', '--today',
                     action='store_true', help='display a summary of today\'s work')
+parser.add_argument('-k', '--week',
+                    action='store_true', help='display a summary of this week\'s work')
 parser.add_argument('-d', '--display',
                     action='store_true', help='display work clock records')
 
@@ -56,14 +58,16 @@ if (args.work or args.break_ or args.lunch) and (args.clk_in or args.clk_out):
         clock_type = TaskType.LUNCH
     action = ActionType(args.clk_in)
 
-    record = clockdb.add_clk_record(clock_type, action)
+    record = clockdb.add_record(clock_type, action)
     clockdb.display_record(utils.tstr_to_tstamp(record[1]), TaskType(record[2]), ActionType(record[3]))
 elif args.remove:
-    clockdb.remove_clk_records(args.remove)
+    clockdb.remove_records(args.remove)
 elif args.clear:
-    clockdb.clear_clk_record()
+    clockdb.clear_record()
 
 if args.display and not args.clear:
     clockdb.display()
 if args.today:
     clockdb.display_summary_today()
+if args.week:
+    clockdb.display_summary_week()
