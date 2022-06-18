@@ -19,7 +19,9 @@ class ClockerDatabase:
                 uuid TEXT,
                 task INT,
                 action INT,
-                timestamp TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%f', 'now', 'localtime'))
+                timestamp TEXT DEFAULT (
+                    strftime('%Y-%m-%dT%H:%M:%f', 'now', 'localtime')
+                )
             )""")
         self.uuids = []
     
@@ -29,21 +31,31 @@ class ClockerDatabase:
         * No lunch or break without work
         """
         # The same action cannot be repeated twice in a row
-        self.c.execute("SELECT action FROM ClockRecords WHERE task=? ORDER BY timestamp DESC LIMIT 1", (task.value,))
+        self.c.execute("SELECT action FROM ClockRecords WHERE task=? \
+            ORDER BY timestamp DESC LIMIT 1", (task.value,)
+        )
         res = self.c.fetchone()
         if res is not None:
             if action.value == res[0]:
-                print(f'ERROR: already clocked {action.name} for {task.name}; cannot clock {action.name} again')
+                print(f'ERROR: already clocked {action.name} for {task.name}; \
+                    cannot clock {action.name} again'
+                )
         elif action == ActionType.OUT:
-            print(f'ERROR: cannot clock OUT for {task.name} when not clocked IN for {task.name}')
+            print(f'ERROR: cannot clock OUT for {task.name} \
+                when not clocked IN for {task.name}'
+            )
 
         # If clocking IN for BREAK/LUNCH, the last WORK must be IN (not OUT)
         # (no BREAK/LUNCH w/o WORK active)
         if task != TaskType.WORK and action == ActionType.IN:
-            self.c.execute("SELECT action FROM ClockRecords WHERE task=? ORDER BY timestamp DESC LIMIT 1", (TaskType.WORK.value,))
+            self.c.execute("SELECT action FROM ClockRecords WHERE task=? \
+                ORDER BY timestamp DESC LIMIT 1", (TaskType.WORK.value,)
+            )
             res = self.c.fetchone()
             if res is None or res[0] == ActionType.OUT.value:
-                print(f'ERROR: cannot clock IN for {task.name} when not clocked IN for WORK')
+                print(f'ERROR: cannot clock IN for {task.name} \
+                    when not clocked IN for WORK'
+                )
     
     def add_record(self, task: TaskType, action: ActionType):
         """Adds a record to the ClockRecords table."""
@@ -51,8 +63,12 @@ class ClockerDatabase:
         self._validate_prospective_record(task, action)
         uuid_ = utils.get_uuid()
         with self.conn:
-            self.c.execute("INSERT INTO ClockRecords (uuid, task, action) VALUES (?, ?, ?)", (uuid_, task.value, action.value))
-        self.c.execute("SELECT uuid, timestamp, task, action FROM ClockRecords WHERE uuid=?", (uuid_,))
+            self.c.execute("INSERT INTO ClockRecords (uuid, task, action) \
+                VALUES (?, ?, ?)", (uuid_, task.value, action.value)
+            )
+        self.c.execute("SELECT uuid, timestamp, task, action \
+            FROM ClockRecords WHERE uuid=?", (uuid_,)
+        )
         
         return self.c.fetchone()
     
@@ -80,87 +96,75 @@ class ClockerDatabase:
         self.c.execute("SELECT * FROM ClockRecords WHERE uuid=?", (uuid_,))
         return self.c.fetchone()
 
-    def display_record(self, tstamp, task: TaskType, action: ActionType):
-        """Displays the given record."""
+    def display_record(self, tstamp, task: TaskType, action: ActionType, show_date: bool=True):
+        """Displays the given record from the ClockRecords table."""
 
-        if tstamp is not None:
+        if show_date:
             print(f'{utils.tstamp_to_tstr(tstamp)} | {task.name} {action.name}')
         else:
-            print(f'{" ": <23} | {task.name} {action.name}')
+            print(f'{utils.tstamp_to_timestr(tstamp): >23} | {task.name} {action.name}')
 
     def display(self):
         """Displays all records from the ClockRecords table."""
 
         self.c.execute("SELECT timestamp, task, action, uuid FROM ClockRecords \
-            ORDER BY timestamp ASC")
+            ORDER BY timestamp ASC"
+        )
         i = 1
         last_tstamp = None
         for record in self.c.fetchall():
             print(f'{i:02}', end=': ')
             tstamp = utils.tstr_to_tstamp(record[0])
-            if tstamp.date == last_tstamp:
-                self.display_record(None, TaskType(record[1]), ActionType(record[2]))
+            if last_tstamp is not None and tstamp.date() == last_tstamp.date():
+                self.display_record(tstamp, TaskType(record[1]), ActionType(record[2]), show_date=False)
             else:
                 self.display_record(tstamp, TaskType(record[1]), ActionType(record[2]))
             last_tstamp = tstamp
             i += 1
     
-    def display_summary_for_day(self, date):
+    def display_summary_for_day(self, date: datetime):
         # Get the work hours for today
         self.c.execute("SELECT timestamp, task, action FROM ClockRecords \
                 WHERE timestamp > (strftime('%Y-%m-%dT00:00:00.000', 'now', 'localtime')) \
                     AND timestamp < (strftime('%Y-%m-%dT00:00:00.000', 'now', 'localtime', '+1 day')) \
                 ORDER BY timestamp ASC")
         
-        work_sum = 0
-        lunch_sum = 0
-        break_sum = 0
+        task_sums = {
+            TaskType.WORK: 0,
+            TaskType.LUNCH: 0,
+            TaskType.BREAK: 0
+        }
 
-        prev_work_in = None
-        prev_lunch_in = None
-        prev_break_in = None
+        prev_task_in = {
+            TaskType.WORK: None,
+            TaskType.LUNCH: None,
+            TaskType.BREAK: None
+        }
 
-        # TODO: turn these into seperate functions (reduce code repitition)
         for record in self.c.fetchall():
             tstamp = utils.tstr_to_tstamp(record[0])
-            if record[1] == TaskType.WORK.value:  # WORK
-                if record[2] == ActionType.OUT.value:  # Clocking OUT
-                    if prev_work_in is None:  # WORK not clocked IN yet, (add time from start of day)
-                        work_sum += (tstamp - date).total_seconds()
-                    else:  # WORK IN record exists
-                        work_sum += (tstamp - prev_work_in).total_seconds()
-                prev_work_in = tstamp
+            task = TaskType(record[1])
+            action = ActionType(record[2])
             
-            if record[1] == TaskType.LUNCH.value:  # LUNCH
-                if record[2] == ActionType.OUT.value:  # Clocking OUT
-                    if prev_lunch_in is None:  # LUNCH not clocked IN yet, (add time from start of day)
-                        lunch_sum += (tstamp - date).total_seconds()
-                    else:  # LUNCH IN record exists
-                        lunch_sum += (tstamp - prev_lunch_in).total_seconds()
-                prev_lunch_in = tstamp
-            
-            if record[1] == TaskType.BREAK.value:  # BREAK
-                if record[2] == ActionType.OUT.value:  # Clocking OUT
-                    if prev_break_in is None:  # BREAK not clocked IN yet, (add time from start of day)
-                        break_sum += (tstamp - date).total_seconds()
-                    else:  # BREAK IN record exists
-                        break_sum += (tstamp - prev_break_in).total_seconds()
-                prev_break_in = tstamp
+            if action == ActionType.OUT:  # clocking OUT (record time)
+                if prev_task_in[task] is None:  # action not clocked IN yet (add time from start of day)
+                    task_sums[task] += (tstamp - date).total_seconds()
+                else:  # action IN record exists (not None)
+                    task_sums[task] += (tstamp - prev_task_in[task]).total_seconds()
 
-        work_sum -= lunch_sum
-        work_sum -= break_sum
+            prev_task_in[task] = tstamp
+
+        task_sums[TaskType.WORK] -= task_sums[TaskType.LUNCH]
+        task_sums[TaskType.WORK] -= task_sums[TaskType.BREAK]
          
-        work_mins, work_seconds = divmod(int(work_sum), 60)
-        work_hrs, work_mins = divmod(work_mins, 60)
-        print(f'Total WORK : {work_hrs} hrs, {work_mins} mins, {work_seconds} seconds')
-        # FEATURE: add pay based on how many hours you worked (round to 15 mins too!)
-        lunch_mins, lunch_seconds = divmod(int(lunch_sum), 60)
-        lunch_hrs, lunch_mins = divmod(lunch_mins, 60)
-        print(f'Total LUNCH: {lunch_hrs} hrs, {lunch_mins} mins, {lunch_seconds} seconds')
+        work = utils.get_time_parts(int(task_sums[TaskType.WORK]))
+        print(f'Total WORK : {work["hours"]} hrs, {work["minutes"]} mins, {work["seconds"]} seconds')
         
-        break_mins, break_seconds = divmod(int(break_sum), 60)
-        break_hrs, break_mins = divmod(break_mins, 60)
-        print(f'Total BREAK: {break_hrs} hrs, {break_mins} mins, {break_seconds} seconds')
+        lunch = utils.get_time_parts(int(task_sums[TaskType.LUNCH]))
+        print(f'Total LUNCH: {lunch["hours"]} hrs, {lunch["minutes"]} mins, {lunch["seconds"]} seconds')
+
+        break_ = utils.get_time_parts(int(task_sums[TaskType.BREAK]))
+        print(f'Total break_: {break_["hours"]} hrs, {break_["minutes"]} mins, {break_["seconds"]} seconds')
 
     def display_summary_today(self):
         self.display_summary_for_day(datetime.today())
