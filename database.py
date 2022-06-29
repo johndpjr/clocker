@@ -38,11 +38,11 @@ class ClockerDatabase:
         if res is not None:
             if action.value == res[0]:
                 utils.raise_user_error(f'ERROR: already clocked {action.name} for {task.name}; ' +
-                    'cannot clock {action.name} again'
+                    f'cannot clock {action.name} again'
                 )
         elif action == ActionType.OUT:
             utils.raise_user_error(f'ERROR: cannot clock OUT for {task.name} ' +
-                'when not clocked IN for {task.name}'
+                f'when not clocked IN for {task.name}'
             )
 
         # If clocking IN for BREAK/LUNCH, the last WORK must be IN (not OUT)
