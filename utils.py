@@ -30,3 +30,11 @@ def get_time_parts(total_secs: int):
     time_parts['hours'] = hours
 
     return time_parts
+
+def raise_user_error(msg: str):
+    """Raises an error that the user is using the program incorrectly
+    and quits the program quietly.
+    """
+
+    print(msg)
+    exit()
