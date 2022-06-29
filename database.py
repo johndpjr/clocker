@@ -37,12 +37,12 @@ class ClockerDatabase:
         res = self.c.fetchone()
         if res is not None:
             if action.value == res[0]:
-                print(f'ERROR: already clocked {action.name} for {task.name}; \
-                    cannot clock {action.name} again'
+                utils.raise_user_error(f'ERROR: already clocked {action.name} for {task.name}; ' +
+                    'cannot clock {action.name} again'
                 )
         elif action == ActionType.OUT:
-            print(f'ERROR: cannot clock OUT for {task.name} \
-                when not clocked IN for {task.name}'
+            utils.raise_user_error(f'ERROR: cannot clock OUT for {task.name} ' +
+                'when not clocked IN for {task.name}'
             )
 
         # If clocking IN for BREAK/LUNCH, the last WORK must be IN (not OUT)
@@ -53,8 +53,8 @@ class ClockerDatabase:
             )
             res = self.c.fetchone()
             if res is None or res[0] == ActionType.OUT.value:
-                print(f'ERROR: cannot clock IN for {task.name} \
-                    when not clocked IN for WORK'
+                utils.raise_user_error(f'ERROR: cannot clock IN for {task.name} ' +
+                    'when not clocked IN for WORK'
                 )
     
     def add_record(self, task: TaskType, action: ActionType):
@@ -84,7 +84,7 @@ class ClockerDatabase:
         self.uuids = self.c.fetchall()
         for i in idx_list:
             if i - 1 < 0 or i - 1 > len(self.uuids):
-                print('the index is out of range')
+                utils.raise_user_error('the index is out of range')
             self.remove_record(self.uuids[i-1][0])
         self.uuids = []
     
