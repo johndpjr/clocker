@@ -162,21 +162,16 @@ class ClockerDatabase:
 
         task_sums[TaskType.WORK] -= task_sums[TaskType.LUNCH]
         task_sums[TaskType.WORK] -= task_sums[TaskType.BREAK]
-         
-        work = utils.get_time_parts(int(task_sums[TaskType.WORK]))
-        print(f'Total WORK : {work["hours"]} hrs, {work["minutes"]} mins, {work["seconds"]} seconds')
+
+        for task in task_sums.keys():
+            task_time = utils.get_time_parts(int(task_sums[task]))
+            print(f'{task.name:<5}: {task_time["hours"]:02}:{task_time["minutes"]:02}:{task_time["seconds"]:02}')
         
-        lunch = utils.get_time_parts(int(task_sums[TaskType.LUNCH]))
-        print(f'Total LUNCH: {lunch["hours"]} hrs, {lunch["minutes"]} mins, {lunch["seconds"]} seconds')
-
-        break_ = utils.get_time_parts(int(task_sums[TaskType.BREAK]))
-        print(f'Total BREAK: {break_["hours"]} hrs, {break_["minutes"]} mins, {break_["seconds"]} seconds')
-
     def display_summary_today(self):
         self.display_summary_for_day(datetime.today())
 
     def display_summary_week(self):
-        week_ago = datetime.now().date() - timedelta(days=7)
+        week_ago = datetime.now().date() - timedelta(days=6)
         for i in range(7):
             day = week_ago + timedelta(days=i)
             self.display_summary_for_day(day)
