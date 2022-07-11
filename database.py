@@ -27,9 +27,9 @@ class ClockerDatabase:
     
     def _validate_prospective_record(self, task: TaskType, action: ActionType):
         """Validates that this record can be added to ClockRecords.
-        * The same action for a task cannot be repeated twice in a row
-        * No lunch or break without work
+        Raises errors when the prospective record cannot be added.
         """
+
         # The same action cannot be repeated twice in a row
         self.c.execute("SELECT action FROM ClockRecords WHERE task=? \
             ORDER BY timestamp DESC LIMIT 1", (task.value,)
@@ -72,7 +72,7 @@ class ClockerDatabase:
         
         return self.c.fetchone()
     
-    def clear_record(self):
+    def dropall(self):
         """Drops the ClockRecord table."""
         with self.conn:
             self.c.execute("DROP TABLE ClockRecords")
@@ -123,11 +123,17 @@ class ClockerDatabase:
             i += 1
     
     def display_summary_for_day(self, date: datetime):
+        print(f'Summary for {utils.tstamp_to_datestr(date)}:')
+
+        end_date = date + timedelta(days=1)
+        q_date = date.strftime('%Y-%m-%dT00:00:00.000')
+        q_end_date = end_date.strftime('%Y-%m-%dT00:00:00.000')
+        
         # Get the work hours for today
         self.c.execute("SELECT timestamp, task, action FROM ClockRecords \
-                WHERE timestamp > (strftime('%Y-%m-%dT00:00:00.000', 'now', 'localtime')) \
-                    AND timestamp < (strftime('%Y-%m-%dT00:00:00.000', 'now', 'localtime', '+1 day')) \
-                ORDER BY timestamp ASC")
+                WHERE timestamp > (?) \
+                    AND timestamp < (?) \
+                ORDER BY timestamp ASC", (q_date, q_end_date))
         
         task_sums = {
             TaskType.WORK: 0,
@@ -164,10 +170,13 @@ class ClockerDatabase:
         print(f'Total LUNCH: {lunch["hours"]} hrs, {lunch["minutes"]} mins, {lunch["seconds"]} seconds')
 
         break_ = utils.get_time_parts(int(task_sums[TaskType.BREAK]))
-        print(f'Total break_: {break_["hours"]} hrs, {break_["minutes"]} mins, {break_["seconds"]} seconds')
+        print(f'Total BREAK: {break_["hours"]} hrs, {break_["minutes"]} mins, {break_["seconds"]} seconds')
 
     def display_summary_today(self):
         self.display_summary_for_day(datetime.today())
 
     def display_summary_week(self):
-        pass
+        week_ago = datetime.now().date() - timedelta(days=7)
+        for i in range(7):
+            day = week_ago + timedelta(days=i)
+            self.display_summary_for_day(day)

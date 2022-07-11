@@ -30,6 +30,13 @@ activity_group.add_argument('-b', '--break', dest='break_',
 activity_group.add_argument('-l', '--lunch', dest='lunch',
                     action='store_true', help='set task as lunch')
 
+parser.add_argument('-t', '--today',
+                    action='store_true', help='display a summary of today\'s work')
+parser.add_argument('-k', '--week',
+                    action='store_true', help='display a summary of this week\'s work')
+parser.add_argument('-d', '--display',
+                    action='store_true', help='display work clock records')
+
 # remove_group contains all commands that remove clock records
 #   from the table
 remove_group = parser.add_mutually_exclusive_group()
@@ -37,13 +44,6 @@ remove_group.add_argument('-r', '--remove',
                     type=int, nargs='+', help='remove the i_th record')
 remove_group.add_argument('--clear',
                     action='store_true', help='remove all clock records')
-
-parser.add_argument('-t', '--today',
-                    action='store_true', help='display a summary of today\'s work')
-parser.add_argument('-k', '--week',
-                    action='store_true', help='display a summary of this week\'s work')
-parser.add_argument('-d', '--display',
-                    action='store_true', help='display work clock records')
 
 args = parser.parse_args()
 
@@ -61,14 +61,17 @@ if (args.work or args.break_ or args.lunch) and (args.clk_in or args.clk_out):
 
     record = clockdb.add_record(clock_type, action)
     clockdb.display_record(utils.tstr_to_tstamp(record[1]), TaskType(record[2]), ActionType(record[3]))
-elif args.remove:
-    clockdb.remove_records(args.remove)
-elif args.clear:
-    clockdb.clear_record()
 
-if args.display and not args.clear:
+if args.display:
     clockdb.display()
 if args.today:
     clockdb.display_summary_today()
 if args.week:
     clockdb.display_summary_week()
+
+if args.remove:
+    clockdb.remove_records(args.remove)
+if args.clear:
+    resp = input('Delete all clock records? [Y/n] ')
+    if not resp or resp.upper() == 'Y':
+        clockdb.dropall()
