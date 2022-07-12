@@ -52,9 +52,26 @@ class ClockerDatabase:
                 ORDER BY timestamp DESC LIMIT 1", (TaskType.WORK.value,)
             )
             res = self.c.fetchone()
+            
+            # Cannot clock IN for lunch/break when not clocked IN for WORK
             if res is None or res[0] == ActionType.OUT.value:
                 utils.raise_user_error(f'ERROR: cannot clock IN for {task.name} ' +
                     'when not clocked IN for WORK'
+                )
+
+            # Cannot clock IN lunch/break if break/lunch is already IN
+            self.c.execute("SELECT task FROM ClockRecords WHERE action=? \
+                ORDER BY timestamp DESC LIMIT 1", (ActionType.IN.value,)
+            )
+            res = self.c.fetchone()
+            
+            if res[0] == TaskType.LUNCH.value and task == TaskType.BREAK:
+                utils.raise_user_error('ERROR: cannot clock IN for BREAK ' +
+                    'when clocked IN for LUNCH'
+                )
+            elif res[0] == TaskType.BREAK.value and task == TaskType.LUNCH:
+                utils.raise_user_error('ERROR: cannot clock IN for LUNCH when ' +
+                    'when clocked IN for BREAK'
                 )
     
     def add_record(self, task: TaskType, action: ActionType):
